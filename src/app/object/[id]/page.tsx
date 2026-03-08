@@ -1,25 +1,52 @@
 import React from 'react';
 import Link from 'next/link';
 import { ArrowLeft, Map, Star as StarIcon, Info } from 'lucide-react';
-import { MOCK_OBJECTS, MOCK_CATALOGUES } from '@/lib/data/catalogs';
+import { Catalogue, CelestialObject } from '@/types/AstroWeb.tofdan';
 import { Badge } from '@/components/ui/Badge';
 import { CollectionManager } from '@/components/features/CollectionManager';
+import { headers } from 'next/headers';
+
+async function getObjectData(id: string): Promise<{ object: CelestialObject | null, catalogue: Catalogue | null }> {
+  const headersList = await headers();
+  const host = headersList.get('host') || 'localhost:3000';
+  const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
+
+  try {
+    const objRes = await fetch(`${protocol}://${host}/api/object/${id}`, { cache: 'no-store' });
+    if (!objRes.ok) return { object: null, catalogue: null };
+    
+    const objJson = await objRes.json();
+    const object: CelestialObject | null = objJson.data;
+
+    let catalogue: Catalogue | null = null;
+    if (object) {
+      const catRes = await fetch(`${protocol}://${host}/api/catalogues`, { cache: 'no-store' });
+      if (catRes.ok) {
+        const catJson = await catRes.json();
+        catalogue = catJson.data?.find((c: Catalogue) => c.id === object.catalogueId) || null;
+      }
+    }
+
+    return { object, catalogue };
+  } catch (err) {
+    console.error(`Failed to fetch object data for ${id}:`, err);
+    return { object: null, catalogue: null };
+  }
+}
 
 export default async function ObjectDetailPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
   
-  const object = MOCK_OBJECTS.find(o => o.id === id);
+  const { object, catalogue } = await getObjectData(id);
   
   if (!object) {
     return (
       <div className="py-20 text-center">
         <h1 className="text-2xl font-bold text-slate-100">Objet non trouvé</h1>
-        <Link href="/" className="mt-4 inline-block text-indigo-400 hover:text-indigo-300 underline">Retour à l'accueil</Link>
+        <Link href="/" className="mt-4 inline-block text-indigo-400 hover:text-indigo-300 underline">Retour à l&apos;accueil</Link>
       </div>
     );
   }
-
-  const catalogue = MOCK_CATALOGUES.find(c => c.id === object.catalogueId);
 
   return (
     <div className="max-w-6xl mx-auto space-y-8 animate-in fade-in duration-500">
@@ -66,7 +93,7 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ i
              <div className="absolute bottom-6 left-6 right-6">
                 <p className="text-sm font-medium text-slate-300 flex items-center gap-2">
                   <Info size={16} className="text-indigo-400"/>
-                  Image de référence d'archive
+                  Image de référence d&apos;archive
                 </p>
              </div>
           </div>
@@ -89,10 +116,10 @@ export default async function ObjectDetailPage({ params }: { params: Promise<{ i
              <dl className="space-y-4 text-sm">
                 <div>
                   <dt className="text-slate-500 mb-1">Catalogue Officiel</dt>
-                  <dd className="font-medium text-slate-200">{catalogue?.name}</dd>
+                  <dd className="font-medium text-slate-200">{catalogue?.name || object.catalogueId}</dd>
                 </div>
                 <div>
-                  <dt className="text-slate-500 mb-1">Type d'objet</dt>
+                  <dt className="text-slate-500 mb-1">Type d&apos;objet</dt>
                   <dd className="font-medium text-slate-200">{object.type}</dd>
                 </div>
                 

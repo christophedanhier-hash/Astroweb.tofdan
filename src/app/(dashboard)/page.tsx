@@ -1,9 +1,30 @@
 import React from 'react';
-import { Share2, Sparkles } from 'lucide-react';
-import { MOCK_CATALOGUES } from '@/lib/data/catalogs';
+import { Sparkles } from 'lucide-react';
 import { CatalogueCard } from '@/components/features/CatalogueCard';
+import { ShareButton } from '@/components/features/ShareButton';
+import { Catalogue } from '@/types/AstroWeb.tofdan';
+import { headers } from 'next/headers';
 
-export default function DashboardPage() {
+async function getCatalogues(): Promise<Catalogue[]> {
+  // Using absolute URL for server-side fetching
+  const headersList = await headers();
+  const host = headersList.get('host') || 'localhost:3000';
+  const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
+  
+  try {
+    const res = await fetch(`${protocol}://${host}/api/catalogues`, { cache: 'no-store' });
+    if (!res.ok) return [];
+    const json = await res.json();
+    return json.data || [];
+  } catch (err) {
+    console.error("Failed to fetch catalogues:", err);
+    return [];
+  }
+}
+
+export default async function DashboardPage() {
+  const catalogues = await getCatalogues();
+
   return (
     <div className="space-y-12">
       {/* Hero Section */}
@@ -16,20 +37,14 @@ export default function DashboardPage() {
             <span>Bienvenue sur AstroWeb.tofdan</span>
           </div>
           <h1 className="text-4xl font-extrabold tracking-tight sm:text-6xl text-transparent bg-clip-text bg-gradient-to-br from-white to-slate-400">
-            Votre Pokédex<br />Stellaire Personnel
+            Mon Pokédex<br />Stellaire Personnel
           </h1>
           <p className="text-lg text-slate-400">
-            Explorez l'univers, cataloguez vos observations et complétez vos collections parmi les catalogues d'astronomie les plus célèbres.
+            Explorez ma collection personnelle d&apos;observations astronomiques, documentées à travers les catalogues les plus célèbres de l&apos;univers.
           </p>
           
           <div className="flex justify-center gap-4 pt-4">
-            <button className="flex items-center gap-2 rounded-full bg-indigo-600 px-6 py-3 text-sm font-bold text-white transition-all hover:bg-indigo-500 hover:shadow-lg hover:shadow-indigo-500/25">
-              <span>Commencer l'exploration</span>
-            </button>
-            <button className="flex items-center gap-2 rounded-full border border-slate-700 bg-slate-800/50 px-6 py-3 text-sm font-bold text-slate-300 transition-all hover:bg-slate-700 hover:text-white">
-              <Share2 size={18} />
-              <span>Partager</span>
-            </button>
+            <ShareButton />
           </div>
         </div>
       </section>
@@ -38,16 +53,22 @@ export default function DashboardPage() {
       <section className="space-y-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-2xl font-bold tracking-tight text-slate-100">Catalogues Disponibles</h2>
-            <p className="text-slate-400">Choisissez votre prochaine quête céleste.</p>
+            <h2 className="text-2xl font-bold tracking-tight text-slate-100">Catalogues Explorés</h2>
+            <p className="text-slate-400">Découvrez les objets célestes que j&apos;ai capturés.</p>
           </div>
         </div>
 
-        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
-          {MOCK_CATALOGUES.map((catalogue) => (
-             <CatalogueCard key={catalogue.id} catalogue={catalogue} />
-          ))}
-        </div>
+        {catalogues.length > 0 ? (
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+            {catalogues.map((catalogue) => (
+               <CatalogueCard key={catalogue.id} catalogue={catalogue} />
+            ))}
+          </div>
+        ) : (
+          <div className="text-center py-12 border border-slate-800 rounded-xl bg-slate-900/50">
+            <p className="text-slate-400">En attente de connexion avec Google Sheets...</p>
+          </div>
+        )}
       </section>
     </div>
   );

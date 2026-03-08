@@ -7,7 +7,7 @@ import { cn } from '../ui/Badge';
 export function CatalogueCard({ catalogue, className }: { catalogue: Catalogue, className?: string }) {
   
   // Choose icon dynamically or map it
-  const IconMap: Record<string, any> = {
+  const IconMap: Record<string, React.ElementType> = {
     Telescope,
     Star,
     Galaxy: Orbit,
