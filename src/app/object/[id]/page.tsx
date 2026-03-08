@@ -4,26 +4,53 @@ import { ArrowLeft, Map, Star as StarIcon, Info } from 'lucide-react';
 import { Catalogue, CelestialObject } from '@/types/AstroWeb.tofdan';
 import { Badge } from '@/components/ui/Badge';
 import { CollectionManager } from '@/components/features/CollectionManager';
-import { headers } from 'next/headers';
+import { getSheetData } from '@/lib/google';
 
 async function getObjectData(id: string): Promise<{ object: CelestialObject | null, catalogue: Catalogue | null }> {
-  const headersList = await headers();
-  const host = headersList.get('host') || 'localhost:3000';
-  const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
-
   try {
-    const objRes = await fetch(`${protocol}://${host}/api/object/${id}`, { cache: 'no-store' });
-    if (!objRes.ok) return { object: null, catalogue: null };
+    const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
     
-    const objJson = await objRes.json();
-    const object: CelestialObject | null = objJson.data;
+    if (!spreadsheetId) {
+      console.warn('ObjectDetailPage: Spreadsheet ID missing. Using mock data.');
+      const { MOCK_CATALOGUES, MOCK_OBJECTS } = await import('@/lib/data/catalogs');
+      const obj = MOCK_OBJECTS.find(o => o.id === id) || null;
+      const cat = obj ? MOCK_CATALOGUES.find(c => c.id === obj.catalogueId) || null : null;
+      return { object: obj, catalogue: cat };
+    }
+
+    const [catRows, objRows] = await Promise.all([
+      getSheetData(spreadsheetId, 'Catalogues!A2:E'),
+      getSheetData(spreadsheetId, 'Objects!A2:H')
+    ]);
+
+    let object: CelestialObject | null = null;
+    if (objRows) {
+      const targetRow = objRows.find((row) => row[0] === id);
+      if (targetRow) {
+        object = {
+          id: targetRow[0],
+          name: targetRow[1],
+          catalogueId: targetRow[2],
+          type: targetRow[3],
+          principalStars: targetRow[4] ? targetRow[4].split(',').map((s: string) => s.trim()) : [],
+          description: targetRow[5],
+          imageUrl: targetRow[6] || null,
+          status: targetRow[7] || 'AWAITING_DISCOVERY',
+        };
+      }
+    }
 
     let catalogue: Catalogue | null = null;
-    if (object) {
-      const catRes = await fetch(`${protocol}://${host}/api/catalogues`, { cache: 'no-store' });
-      if (catRes.ok) {
-        const catJson = await catRes.json();
-        catalogue = catJson.data?.find((c: Catalogue) => c.id === object.catalogueId) || null;
+    if (object && catRows) {
+      const targetCat = catRows.find((row) => row[0] === object.catalogueId);
+      if (targetCat) {
+        catalogue = {
+          id: targetCat[0],
+          name: targetCat[1],
+          description: targetCat[2],
+          totalObjects: parseInt(targetCat[3]) || 0,
+          iconType: targetCat[4] || 'star',
+        };
       }
     }
 

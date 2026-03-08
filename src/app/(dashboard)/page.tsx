@@ -3,19 +3,30 @@ import { Sparkles } from 'lucide-react';
 import { CatalogueCard } from '@/components/features/CatalogueCard';
 import { ShareButton } from '@/components/features/ShareButton';
 import { Catalogue } from '@/types/AstroWeb.tofdan';
-import { headers } from 'next/headers';
+import { getSheetData } from '@/lib/google';
 
 async function getCatalogues(): Promise<Catalogue[]> {
-  // Using absolute URL for server-side fetching
-  const headersList = await headers();
-  const host = headersList.get('host') || 'localhost:3000';
-  const protocol = process.env.NODE_ENV === 'development' ? 'http' : 'https';
-  
   try {
-    const res = await fetch(`${protocol}://${host}/api/catalogues`, { cache: 'no-store' });
-    if (!res.ok) return [];
-    const json = await res.json();
-    return json.data || [];
+    const spreadsheetId = process.env.GOOGLE_SHEETS_SPREADSHEET_ID;
+    
+    if (!spreadsheetId) {
+      console.warn('Dashboard: Spreadsheet ID is missing. Using mock data.');
+      const { MOCK_CATALOGUES } = await import('@/lib/data/catalogs');
+      return MOCK_CATALOGUES;
+    }
+
+    const range = 'Catalogues!A2:E';
+    const rows = await getSheetData(spreadsheetId, range);
+
+    if (!rows || rows.length === 0) return [];
+
+    return rows.map((row) => ({
+      id: row[0],
+      name: row[1],
+      description: row[2],
+      totalObjects: parseInt(row[3]) || 0,
+      iconType: row[4] || 'star',
+    }));
   } catch (err) {
     console.error("Failed to fetch catalogues:", err);
     return [];
